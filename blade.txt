@@ -1,0 +1,138 @@
+ENTITY/PT0(6001),PT1(200),PT2(100),PT3(100),PT4(100),SPL1(20),SPL2(20),$
+SPL3(20),SPL4(20),SPLC(3),LN(20),LN1(20),SSRF(5),SOL(5),BLD(5),PLN
+STRING/FNAM(50)
+NUMBER/x1,y1,x2,y2,R(8),NUM,MAT(12),A(3),B(3),R0,C0,R1,cf,rf,xm,fi(6),dfi
+
+DELETE/ALL
+
+C0=0.44
+R0=7.75
+R1=0.21
+xm=0
+
+PARAM/'ENTER DATA','C=',C0,'R=',R0,RSP1
+BCK10:
+PARAM/'Enter blade begining position','R1=',R1,RSP1
+
+$$ Radius polonymal $$
+R(7)=-184.82
+R(6)=641.23
+R(5)=-912.87
+R(4)=683.5
+R(3)=-284.18
+R(2)=62.234
+R(1)=-4.6044
+
+PARAM/'Enter polynomial coefficients',$
+'r^6',R(7),'r^5',R(6),'r^4',R(5),$
+'r^3',R(4),'r^2',R(3),'r',R(2),'X',R(1),RSP1
+
+$$ Pitch polonymal $$
+fi(4)=0
+fi(3)=0
+fi(2)=-11.814
+fi(1)=8.2364
+PARAM/'Enter polynomial coefficients',$
+'fi^3',fi(4),'fi^2',fi(3),'fi',fi(2),'X',fi(1),RSP1
+
+
+BCK20:
+
+FNAM='E:\praca doktorska\artykuly\23015.txt'
+
+M=16
+dr=(1-R1)/M
+K=0
+
+L10:
+
+N=0
+FETCH/TXT,1,FNAM
+RESET/1
+
+L20:
+N=N+1
+READ/1,LINNO,N*10,IFEND,L30:,x1,y1,x2,y2
+
+$$ current radius $$
+cr=(K*dr)+R1
+
+$$ delta chord $$
+dc=R(7)*cr**6+R(6)*cr**5+R(5)*cr**4+R(4)*cr**3+R(3)*cr**2+R(2)*cr+R(1)
+
+PRINT/USING,'Wartość wyliczona dc=#@@@@.@@',dc
+PRINT/USING,'Wartość wyliczona cr=#@@@@.@@',cr
+
+IFTHEN/K>(M/2)
+IF/dc<1, xm=(C0*(1-dc))/2 
+ENDIF
+
+PT0(N)=POINT/x1*C0*dc+xm,y1*C0*dc,cr*R0
+PT1(N)=POINT/x2*C0*dc+xm,y2*C0*dc,cr*R0
+
+$$ IF/N==1, PT2(K+1)=POINT/x1*C0*dc+xm,y1*C0*dc,cr*R0
+
+
+JUMP/L20:
+
+
+L30:
+$$ PT3(K+1)=POINT/x1*C0*dc+xm,y1*C0*dc,cr*R0
+
+
+$$ Airfoil geometry
+SPL3(K+1)=SPLINE/PT0(1..N-1) $$ upper surface
+SPL4(K+1)=SPLINE/PT1(1..N-1) $$ lower surface
+$$ LN1(K+1)=LINE/PT0(N-1),PT1(N-1)
+
+dfi=fi(4)*cr+fi(3)*cr+fi(2)*cr+fi(1)
+
+PRINT/USING,'Wartość wyliczona dc=#@@@@.@@',dc
+PRINT/USING,'Wartość wyliczona cr=#@@@@.@@',cr
+PRINT/USING,'Wartość wyliczona dfi=#@@@@.@@',dfi
+
+MAT=MATRIX/XYROT,-dfi
+SPL1(K+1)=TRANSF/MAT,SPL3(K+1)
+SPL2(K+1)=TRANSF/MAT,SPL4(K+1)
+$$ LN(K+1)=TRANSF/MAT,LN1(K+1)
+
+PT2(K+1)=POINT/ENDOF,XSMALL,SPL1(K+1)
+PT3(K+1)=POINT/ENDOF,XLARGE,SPL1(K+1)
+PT4(K+1)=POINT/ENDOF,XLARGE,SPL2(K+1)
+LN(K+1)=SPLINE/PT3(K+1),PT4(K+1)
+
+DELETE/PT0,PT1,SPL3,SPL4,LN1
+
+IFTHEN/K<M
+K=K+1
+JUMP/L10:
+ELSE
+JUMP/L40:
+ENDIF
+
+L40:
+A=&POINT(PT3(1))
+B=&POINT(PT4(1))
+
+SPLC(1)=SPLINE/PT2(1..K+1)
+SPLC(2)=SPLINE/PT3(1..K+1)
+SPLC(3)=SPLINE/PT4(1..K+1)
+$$ ,VECT,B(1)-A(1),B(2)-A(2),B(3)-A(3)
+
+
+
+SSRF(1)=BSURF/MESH,SPLC(1..2),WITH,SPL1(1..K+1),TYPE,3,TOLER,.01,.01
+SSRF(2)=BSURF/MESH,SPLC(1),SPLC(3),WITH,SPL2(1..K+1),TYPE,3,TOLER,.01,.01
+$$ SSRF(3)=BSURF/MESH,SPLC(2),SPLC(3),WITH,LN(1..K+1),TYPE,3,TOLER,.01,.01
+
+$$SSRF(1) = SSURF/PRIMA,SPL1(1..K+1),CROSS,SPLC(1..2)
+$$SSRF(2) = SSURF/PRIMA,SPL2(1..K+1),CROSS,SPLC(1),SPLC(3)
+SSRF(3) = RLDSRF/SPLC(2),,SPLC(3)
+
+SSRF(4) =RLDSRF/SPL1(1),,SPL2(1)
+SSRF(5) =RLDSRF/SPL1(K+1),,SPL2(K+1)
+BLD(1)=SEW/SSRF(1..5)
+
+DELETE/PT2,PT3,PT4,LN,SPLC
+
+HALT
